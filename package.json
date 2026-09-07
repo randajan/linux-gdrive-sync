@@ -35,6 +35,7 @@
     "url": "https://www.linkedin.com/in/randajan/"
   },
   "dependencies": {
+    "@randajan/props": "^0.1.4",
     "@randajan/queue": "^2.0.0",
     "chokidar": "^5.0.0"
   }

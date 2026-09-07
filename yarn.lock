@@ -132,6 +132,11 @@
   resolved "https://registry.yarnpkg.com/@esbuild/win32-x64/-/win32-x64-0.28.2.tgz#b21affb804cc167c133d95f45b3a1dc1323b9a87"
   integrity sha512-5ebpxr3nWMzrL/rnUI755Jkuee0bHL/Gq0WTF9lvcpv73wAp5eu8MfBUgWK9bhWvZjj7yX8etf/8tI8Ney695g==
 
+"@randajan/props@^0.1.4":
+  version "0.1.4"
+  resolved "https://registry.yarnpkg.com/@randajan/props/-/props-0.1.4.tgz#af4fa4327d69e1cbfd281df0c2e546cf6761f66d"
+  integrity sha512-F0qkf+s2p6SEO5nkHNCAL34/m39CAPF8j0+isx7TazvBHk8BXoCQxLEM5f6PL3G6R1TCSFVkqerI4T017yTQBA==
+
 "@randajan/queue@^2.0.0":
   version "2.0.0"
   resolved "https://registry.yarnpkg.com/@randajan/queue/-/queue-2.0.0.tgz#009bb7fa76b2eedb3572478ae5526ee31cef5311"
