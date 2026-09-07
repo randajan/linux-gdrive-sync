@@ -1,0 +1,41 @@
+{
+  "name": "@randajan/linux-gdrive-sync",
+  "version": "0.0.1",
+  "description": "Linux desktop client for Google Drive built on rclone, with safe bidirectional sync, duplicate detection, local change watching, logging, and desktop status integration.",
+  "repository": "randajan/linux-gdrive-sync",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/cjs/index.cjs"
+    }
+  },
+  "scripts": {
+    "build": "node index.js isBuild=true"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@randajan/simple-lib": "^3.3.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [],
+  "homepage": "https://github.com/randajan/linux-gdrive-sync",
+  "bugs": {
+    "url": "https://github.com/randajan/linux-gdrive-sync/issues"
+  },
+  "author": {
+    "name": "Jan Randa",
+    "email": "jnranda@gmail.com",
+    "url": "https://www.linkedin.com/in/randajan/"
+  },
+  "dependencies": {
+    "@randajan/queue": "^2.0.0",
+    "chokidar": "^5.0.0"
+  }
+}
