@@ -5,7 +5,7 @@ import * as deleteOrUnlink from "./parsers/deleteOrUnlink";
 import * as moveOrRename from "./parsers/moveOrRename";
 import { parseRclonePath, toRelativePath } from "../rclone/tools";
 
-const _parsers = [
+export const bisyncActivityParsers = [
     copyDirection,
     queuedDelete,
     createOrUpdate,
@@ -21,6 +21,7 @@ const sideFromPathNumber = v=>{
 export class ActivityParser {
 
     #task;
+    #parsers;
     #localPath;
     #remoteName;
     #onActivity;
@@ -28,7 +29,8 @@ export class ActivityParser {
     #copyTargetSide;
     #pendingDeletes = new Map();
 
-    constructor(localPath, remoteName, onActivity=()=>{}) {
+    constructor(parsers, localPath, remoteName, onActivity=()=>{}) {
+        this.#parsers = parsers;
         this.#localPath = localPath;
         this.#remoteName = remoteName;
         this.#onActivity = onActivity;
@@ -63,7 +65,7 @@ export class ActivityParser {
 
         if (!log?.msg || !task.isState("running")) { return; }
 
-        for (const parser of _parsers) {
+        for (const parser of this.#parsers) {
             const pass = parser.preflight(log);
             if (!pass) { continue; }
             

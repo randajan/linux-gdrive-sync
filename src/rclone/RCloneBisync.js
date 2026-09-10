@@ -4,7 +4,7 @@ import { RCloneWatch } from "./RCloneWatch";
 import { RCloneRun } from "./RCloneRun";
 import { EventTrigger } from "../events/Event";
 import { chokidarActionTranslate, parseRclonePath, toRelativePath } from "./tools";
-import { ActivityParser } from "../activity/ActivityParser";
+import { ActivityParser, bisyncActivityParsers } from "../activity/ActivityParser";
 import { ActivityFootprints } from "../activity/ActivityFootprints";
 import nodePath from "path";
 
@@ -12,9 +12,11 @@ import nodePath from "path";
 export class RCloneBisync extends RCloneRun {
 
     #cfg;
+    #intId;
     #bouncer;
     #localWatch;
     #remoteWatch;
+    #activityParsers;
 
     constructor(cfg = {}) {
         const {
@@ -25,31 +27,22 @@ export class RCloneBisync extends RCloneRun {
             forceResyncMs = 15 * 60 * 1000, //15 min resync
             debounceSoftMs = 5 * 1000, //5sec
             debunceHardMs = 5 * 60 * 1000, //5min
-            chokidarDelayMs = 1000 //1sec
+            chokidarDelayMs = 500 //0.5sec
         } = cfg;
 
         super(appRoot);
 
-        this.#cfg = { localPath, remoteName, trashPath, partialSuffix }
-
-        const afps = new ActivityFootprints({ remote: remoteFootprintTtl, local: localFootprintTtl });
-        const activityParser = new ActivityParser(localPath, remoteName, afps.createHandler());
-
-        let int;
-        const planHeartbeat = () => {
-            clearTimeout(int);
-            int = setTimeout(_ => {
-                this.emit(new EventTrigger(this, "heartbeat", { isTimeBased: true }));
-            }, forceResyncMs);
-            int.unref?.();
+        this.#cfg = {
+            localPath, remoteName, trashPath, partialSuffix,
+            forceResyncMs
         }
 
-        const bouncer = this.#bouncer = createQueue(async triggers => {
-            triggers = triggers.map(t => t[0]);
-            clearTimeout(int);
-            await this.#runBisync({ triggers, activityParser });
-            planHeartbeat();
-        }, {
+        const afps = new ActivityFootprints({ remote: remoteFootprintTtl, local: localFootprintTtl });
+        this.#activityParsers = {
+            bisync:new ActivityParser(bisyncActivityParsers, localPath, remoteName, afps.createHandler())
+        }
+
+        const bouncer = this.#bouncer = createQueue(this.#handleTriggers.bind(this), {
             softMs: debounceSoftMs,
             hardMs: debunceHardMs
         });
@@ -61,7 +54,6 @@ export class RCloneBisync extends RCloneRun {
                 pollInterval: 100
             },
             ignored: filePath => {
-
                 const name = nodePath.basename(filePath);
 
                 if (partialSuffix && filePath.endsWith(partialSuffix)) { return true; }
@@ -104,7 +96,7 @@ export class RCloneBisync extends RCloneRun {
         if (runOnInit) {
             this.emit(new EventTrigger(this, "init", { isTimeBased: true }));
         } else {
-            planHeartbeat();
+            this.#planHeartbeat();
         }
     }
 
@@ -121,6 +113,31 @@ export class RCloneBisync extends RCloneRun {
 
     parsePath(targetPath) {
         return parseRclonePath(this.localPath, this.remoteName, targetPath);
+    }
+
+    async #stopHeartbeat() {
+        if (this.#intId == null) { return; }
+        clearTimeout(this.#intId);
+        this.#intId = null;
+    }
+
+    async #planHeartbeat() {
+        this.#stopHeartbeat();
+        this.#intId = setTimeout(_ => {
+            this.emit(new EventTrigger(this, "heartbeat", { isTimeBased: true }));
+        }, this.#cfg.forceResyncMs);
+        this.#intId.unref?.();
+    }
+
+    async #handleTriggers(triggersArgs) {
+        this.#stopHeartbeat();
+        
+        const triggers = triggersArgs.map(t => t[0]);
+
+        const activityParser = this.#activityParsers.bisync;
+        await this.#runBisync({ triggers, activityParser });
+
+        this.#planHeartbeat();
     }
 
     async #runBisync(opt = {}) {
@@ -159,7 +176,7 @@ export class RCloneBisync extends RCloneRun {
         ], passOpt);
     }
 
-    async #runCopy(path, fromSide, opt = {}) {
+    async #runCopy(fromSide, path, opt = {}) {
         const { localPath, remoteName, trashPath, partialSuffix } = this.#cfg;
 
         const local = nodePath.join(localPath, path);
@@ -185,7 +202,7 @@ export class RCloneBisync extends RCloneRun {
         return this.run('copy', args, opt);
     }
 
-    async #runDelete(path, fromSide, opt = {}) {
+    async #runDelete(fromSide, path, opt = {}) {
 
         const { localPath, remoteName, trashPath } = this.#cfg;
 
