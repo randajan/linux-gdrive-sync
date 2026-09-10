@@ -1,5 +1,5 @@
 import fs from "fs";
-import path from "path";
+import nodePath from "path";
 
 export class Logger {
 
@@ -26,7 +26,7 @@ export class Logger {
             this.#date = date;
 
             this.#stream = fs.createWriteStream(
-                path.join(this.#logPath, `${date}.jsonl`),
+                nodePath.join(this.#logPath, `${date}.jsonl`),
                 { flags: "a" }
             );
         }

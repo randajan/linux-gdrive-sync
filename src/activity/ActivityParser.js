@@ -20,20 +20,33 @@ const sideFromPathNumber = v=>{
 
 export class ActivityParser {
 
+    #task;
     #localPath;
     #remoteName;
-    #task;
+    #onActivity;
+
     #copyTargetSide;
     #pendingDeletes = new Map();
 
-    constructor(localPath, remoteName) {
+    constructor(localPath, remoteName, onActivity=()=>{}) {
         this.#localPath = localPath;
         this.#remoteName = remoteName;
+        this.#onActivity = onActivity;
     }
 
+    get task() { return this.#task; }
     get localPath() { return this.#localPath; }
     get remoteName() { return this.#remoteName; }
-    get task() { return this.#task; }
+
+    setTask(task) {
+        if (this.#task) { throw new Error("More than one task was active at the same time"); }
+        this.#task = task;
+        return ()=>{
+            this.#task = undefined;
+            this.#copyTargetSide = undefined;
+            this.#pendingDeletes.clear();
+        }
+    }
 
     getCopyTargetSide() { return this.#copyTargetSide || "?"; }
     setCopyTargetSide(val) { this.#copyTargetSide = sideFromPathNumber(val); }
@@ -45,26 +58,19 @@ export class ActivityParser {
         else { this.#pendingDeletes.delete(path); }
     }
 
-    setTask(task) {
-        if (this.#task) { new Error(`More tasks was active at once`); }
-        this.#task = task;
-    }
-
-    unsetTask(task) {
-        if (this.#task !== task) { new Error(`More tasks was active at once`); }
-        delete this.#task;
-        delete this.#copyTargetSide;
-        this.#pendingDeletes.clear();
-    }
-
     parseLog(task, log) {
-        if (!log?.msg || this.#task !== task) { return; }
-        if (this.task?.isState("running")) { return; }
+        if (this.#task !== task) { throw new Error("More than one task was active at the same time"); }
+
+        if (!log?.msg || !task.isState("running")) { return; }
 
         for (const parser of _parsers) {
             const pass = parser.preflight(log);
             if (!pass) { continue; }
-            return parser.parse(this, pass);
+            
+            const activity = parser.parse(this, pass);
+            if (!activity) { return; }
+            this.#onActivity(activity);
+            return activity;
         }
     };
 
@@ -73,7 +79,9 @@ export class ActivityParser {
     }
 
     parsePath(targetPath) {
-        return parseRclonePath(this.localPath, this.remoteName, targetPath);
+        const { localPath, remoteName } = this;
+        const result = parseRclonePath(localPath, remoteName, targetPath);
+        return result;
     }
 
 }

@@ -24,6 +24,5 @@ export const parse = (parent, logObject) => {
 
     parent.setPendingDeleteSide(candidatePath);
 
-    const { task } = parent;
-    return new EventActivity("delete", { task, side, targetPath: candidatePath });
+    return new EventActivity("delete", parent.task, { side, targetPath: candidatePath });
 };

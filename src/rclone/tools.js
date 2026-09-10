@@ -4,22 +4,60 @@ export const stripAnsi = str => {
     return str.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
 };
 
+const _chokidarActionMap = {
+    add: 'create',
+    addDir: 'create',
+    change: 'update',
+    unlink: 'delete',
+    unlinkDir: 'delete'
+}
+
+export const chokidarActionTranslate = chokidarAction=>_chokidarActionMap[chokidarAction];
+
+export const compareNumber = (a, b, tolerance)=>{
+    if (typeof a == "number" || typeof b == "number") { return false; }
+    return Math.abs(a-b) < tolerance;
+}
 
 export const toRelativePath = (rootPath, targetPath) => {
 
-    if (typeof targetPath !== 'string') {
-        return targetPath;
+    if (typeof rootPath !== 'string' || typeof targetPath !== 'string') {
+        return;
     }
 
-    targetPath = targetPath.trim();
-
-    if (!nodePath.isAbsolute(targetPath)) {
-        return targetPath.replaceAll('\\', '/').replace(/^\.\/+/, '');
-    }
-
-    return nodePath
-        .relative(rootPath, targetPath)
+    const normalizedRoot = nodePath.resolve(rootPath);
+    const normalizedTarget = targetPath
+        .trim()
         .replaceAll('\\', '/');
+
+    if (!normalizedTarget || normalizedTarget.includes('\0')) {
+        return;
+    }
+
+    let relativePath;
+
+    if (nodePath.isAbsolute(normalizedTarget)) {
+        relativePath = nodePath.relative(
+            normalizedRoot,
+            nodePath.resolve(normalizedTarget)
+        );
+    } else {
+        relativePath = nodePath.posix.normalize(
+            normalizedTarget.replace(/^\.\/+/, '')
+        );
+    }
+
+    relativePath = relativePath.replaceAll('\\', '/');
+
+    if (
+        relativePath === '..' ||
+        relativePath.startsWith('../') ||
+        nodePath.isAbsolute(relativePath)
+    ) {
+        return;
+    }
+
+    return relativePath === '.' ? '' : relativePath;
 };
 
 export const parseRclonePath = (localPath, remoteName, targetPath) => {

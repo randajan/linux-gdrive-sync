@@ -64,17 +64,15 @@ export const spawnRclone = (args, opt = {}) => {
         if (!line.trim()) return;
         if (!onLog) { return; }
 
-        try {
-            const entry = JSON.parse(line);
-            if (typeof entry.msg === 'string') {
-                entry.msg = stripAnsi(entry.msg);
-            }
-            onLog(Object.freeze(entry));
+        let entry;
+        try { entry = JSON.parse(line); }
+        catch { return; }
+
+        if (typeof entry.msg === 'string') {
+            entry.msg = stripAnsi(entry.msg);
         }
-        catch {
-            // Normální stdout příkazů jako `rclone version`
-            // není rclone JSON log.
-        }
+
+        onLog(Object.freeze(entry));
     };
 
     const stdoutParser = createLineParser(parseLogLine);

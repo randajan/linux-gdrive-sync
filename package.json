@@ -37,6 +37,7 @@
   "dependencies": {
     "@randajan/props": "^0.1.4",
     "@randajan/queue": "^2.0.0",
-    "chokidar": "^5.0.0"
+    "chokidar": "^5.0.0",
+    "fs-ext": "^2.1.1"
   }
 }

@@ -21,10 +21,10 @@
 export const preflight = ({ msg }) => msg.match(/Path([12])\s+Queue delete\s+-\s*(.+)$/);
 
 export const parse = (parent, queuedDelete) => {
-    const targetPath = parent.toRelativePath(queuedDelete[2]);
+    const { path:targetPath, side:detectedSide } = parent.parsePath(queuedDelete[2]);
     if (!targetPath) { return; }
     
-    parent.setPendingDeleteSide(targetPath, Number(queuedDelete[1]));
+    parent.setPendingDeleteSide(targetPath, detectedSide ?? Number(queuedDelete[1]));
 }
 
 //no activity is returned

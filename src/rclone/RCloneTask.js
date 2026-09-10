@@ -18,7 +18,8 @@ export class RCloneTask {
     #resolve;
     #reject;
 
-    #emitter;
+    #app;
+    #id;
     #name;
     #key;
     #args = [];
@@ -26,11 +27,10 @@ export class RCloneTask {
     #activityParser;
     #triggers = [];
     #ts = { createdAt: new Date() };
-    #id = Date.now();
-
-    constructor(emitter, name, key, args, opt={}) {
-
-        this.#emitter = emitter;
+    
+    constructor(app, name, key, args, opt = {}) {
+        this.#app = app;
+        this.#id = app.nextId();
         this.#name = name;
         this.#key = key;
         this.#args = [...args];
@@ -49,7 +49,7 @@ export class RCloneTask {
         });
     }
 
-    get parent() { return this.#emitter; }
+    get app() { return this.#app; }
 
     get id() { return this.#id; }
     get name() { return this.#name; }
@@ -76,7 +76,7 @@ export class RCloneTask {
     isStates(...states) { return states.includes(this.#state); }
 
     #emit(event) {
-        if (!this.#emitter.emit(event)) { return false; }
+        if (!this.#app.emit(event)) { return false; }
         for (const handler of this.#handlers) { handler(event); }
         return true;
     }
@@ -93,7 +93,7 @@ export class RCloneTask {
         this.#emit(new EventTask(this, "state", { state: "queued", firstOccurence }));
     }
 
-    merge(opt={}) {
+    merge(opt = {}) {
         if (!this.isState("queued")) { throw new Error('Cannot modify running task'); }
 
         const { onEvent, triggers } = opt;
@@ -141,12 +141,12 @@ export class RCloneTask {
         this.#start();
 
         const ap = this.#activityParser;
-        ap?.setTask(this);
+        const unsetTask = ap?.setTask(this);
 
         try {
             const result = await runRclone(
                 this.#args,
-                log =>{
+                log => {
                     this.#emit(new EventTask(this, "log", { log }));
                     if (ap) { this.#addActivity(ap.parseLog(this, log)); }
                 }
@@ -158,14 +158,37 @@ export class RCloneTask {
             this.#fail(error);
         }
         finally {
-            ap?.unsetTask(this);
+            unsetTask?.();
         }
     }
 
     toJSON() {
+        return this.serialize();
+    }
+
+    serialize(isFirstOccurence) {
         const { id, name, state, runtime } = this;
-        const triggers = this.#triggers.length;
-        const activities = this.#activities.length;
-        return { id, name, state, runtime, triggers, activities } 
+        const triggersCount = this.#triggers.length;
+        const activitiesCount = this.#activities.length;
+        const minimal = { id, name, state, runtime, triggersCount, activitiesCount }
+
+        if (isFirstOccurence) {
+            const { key, args, createdAt } = this;
+            const triggers = this.#triggers.map(t => t.id);
+
+            return { ...minimal, key, args, createdAt, triggers };
+        }
+
+        if (this.isStates("completed", "failed")) {
+            const { createdAt, startedAt, endedAt } = this;
+            const activities = this.#activities.map(a=>a.id);
+
+            return { ...minimal, createdAt, startedAt, endedAt, activities }
+
+        }
+
+        
+        return minimal;
+
     }
 }

@@ -9,6 +9,5 @@ export const parse = (parent, { action, object }) => {
     const side = parent.getCopyTargetSide();
     const targetPath = parent.toRelativePath(object);
     if (!targetPath || !side) { return; }
-    const { task } = parent;
-    return new EventActivity(action, { task, side, targetPath });
+    return new EventActivity(action, parent.task, { side, targetPath });
 }

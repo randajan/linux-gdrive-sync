@@ -37,7 +37,7 @@ export class RCloneWatch extends EventEmitter {
         this.#restartMin = restartMin;
         this.#restartMax = restartMax;
 
-        const pollInt = (Number.isInteger(pollInterval) && pollInterval > 0) ? (pollInterval / 1000).toFixed(0) : 10;
+        const pollInt = (Number.isInteger(pollInterval) && pollInterval >= 1000) ? (pollInterval / 1000).toFixed(0) : 10;
 
         this.#args = [
             'test',

@@ -1,47 +1,21 @@
-import { Event } from "../events/Event";
-import { Logger } from "./Logger";
+import { App } from "../app/App";
 import { RCloneTask } from "./RCloneTask";
-import { EventEmitter } from "events";
 
 
-export class RCloneRun extends EventEmitter {
+export class RCloneRun extends App {
 
     #queue = [];
-    #running = null;
-
-    constructor(cfg) {
-        super();
-
-        const { logPath } = cfg;
-
-        if (logPath) {
-            const logger = new Logger({
-                logPath
-            });
-
-            this.on("all", (event)=>{
-                logger.write(event);
-            });
-        }
-
-    }
-
-    emit(event) {
-        if (!event || !(event instanceof Event)) { return false; }
-        const { surname, name } = event;
-
-        super.emit(name, event);
-        super.emit(surname, event);
-        super.emit('all', event);
-
-        return true;
-    }
+    #currentTask = null;
 
     /**
      * @param {string[]} args
      * @param {(entry: object) => void} [onLog]
      */
     run(taskName, args, opt={}) {
+        if (!this.isStates("started", "running")) {
+            throw new Error("App is is not running");
+        }
+
         const last = this.#queue.at(-1);
         const key = RCloneTask.generateKey(taskName, args);
         if (last?.key === key) { return last.merge(opt); }
@@ -50,28 +24,32 @@ export class RCloneRun extends EventEmitter {
 
         this.#queue.push(task);
 
-        if (!this.#running) { this.#next(); }
+        if (!this.#currentTask) { this.#next(); }
         else { task.queued(); }
 
         return task.promise;
     }
 
     async #next() {
-        if (this.#running) return;
+        if (this.#currentTask) return;
 
         const task = this.#queue.shift();
 
         if (!task) return;
 
-        this.#running = task;
+        this.#currentTask = task;
 
-        await task.run();
+        try {
+            await task.run();
+        }
+        finally {
+            this.#currentTask = null;
+            this.#next();
+        }
 
-        this.#running = null;
-        this.#next();
     }
 
-    get isRunning() { return !!this.#running; }
+    get state() { return !!this.#currentTask ? "running" : super.state; }
     get queueSize() { return this.#queue.length; }
-    get isBusy() { return this.isRunning || this.queueSize > 0; }
+    get isBusy() { return !!this.#currentTask || this.queueSize > 0; }
 }

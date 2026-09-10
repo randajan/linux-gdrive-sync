@@ -36,6 +36,5 @@ export const parse = (parent, { renamed, object }) => {
     const action = nodePath.posix.dirname(sourcePath) === nodePath.posix.dirname(targetPath) ? 'rename' : 'move';
 
     const side = parent.getCopyTargetSide();
-    const { task } = parent;
-    return new EventActivity(action, { task, side, sourcePath, targetPath });
+    return new EventActivity(action, parent.task, { side, sourcePath, targetPath });
 }
