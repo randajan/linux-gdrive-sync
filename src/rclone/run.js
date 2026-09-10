@@ -1,7 +1,57 @@
 import { spawn } from 'child_process';
+import { stripAnsi } from './tools';
 
 
-export const runRclone = (args, onLog) => new Promise((resolve, reject) => {
+const createLineParser = (onLine) => {
+
+    let buffer = '';
+
+    const push = chunk => {
+        buffer += chunk;
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+            onLine(line);
+        }
+    };
+
+    const flush = () => {
+        if (buffer.trim()) {
+            onLine(buffer);
+        }
+
+        buffer = '';
+    };
+
+    return {
+        push,
+        flush
+    };
+};
+
+
+/**
+ * Spustí rclone proces a průběžně streamuje jeho výstup.
+ *
+ * Nic neakumuluje v paměti.
+ * Vhodné i pro dlouho běžící procesy typu changenotify.
+ *
+ * @param {string[]} args
+ * @param {object} [opt]
+ * @param {(entry: object) => void} [opt.onLog]
+ * @param {(chunk: string) => void} [opt.onStdout]
+ * @param {(chunk: string) => void} [opt.onStderr]
+ * @returns {import('node:child_process').ChildProcess}
+ */
+export const spawnRclone = (args, opt = {}) => {
+
+    const {
+        onLog,
+        onStdout,
+        onStderr
+    } = opt;
 
     const proc = spawn('rclone', [
         ...args,
@@ -10,75 +60,89 @@ export const runRclone = (args, onLog) => new Promise((resolve, reject) => {
         stdio: ['ignore', 'pipe', 'pipe']
     });
 
+    const parseLogLine = line => {
+        if (!line.trim()) return;
+        if (!onLog) { return; }
+
+        try {
+            const entry = JSON.parse(line);
+            if (typeof entry.msg === 'string') {
+                entry.msg = stripAnsi(entry.msg);
+            }
+            onLog(Object.freeze(entry));
+        }
+        catch {
+            // Normální stdout příkazů jako `rclone version`
+            // není rclone JSON log.
+        }
+    };
+
+    const stdoutParser = createLineParser(parseLogLine);
+    const stderrParser = createLineParser(parseLogLine);
+
+    proc.stdout.on('data', chunk => {
+        const str = chunk.toString();
+
+        onStdout?.(str);
+        stdoutParser.push(str);
+    });
+
+    proc.stderr.on('data', chunk => {
+        const str = chunk.toString();
+
+        onStderr?.(str);
+        stderrParser.push(str);
+    });
+
+    proc.stdout.once('end', () => {
+        stdoutParser.flush();
+    });
+
+    proc.stderr.once('end', () => {
+        stderrParser.flush();
+    });
+
+    return proc;
+};
+
+
+/**
+ * Spustí jednorázový rclone proces a počká na jeho dokončení.
+ *
+ * Na rozdíl od spawnRclone ukládá stdout, stderr a logs.
+ *
+ * @param {string[]} args
+ * @param {(entry: object) => void} [onLog]
+ */
+export const runRclone = (args, onLog) => new Promise((resolve, reject) => {
+
     let stdout = '';
     let stderr = '';
     const logs = [];
 
-    let stdoutBuffer = '';
-    let stderrBuffer = '';
+    let spawnError = null;
 
-    const handleLines = (chunk, stream) => {
+    const proc = spawnRclone(args, {
 
-        const isStdout = stream === 'stdout';
-
-        if (isStdout) {
-            stdout += chunk;
-            stdoutBuffer += chunk;
-        }
-        else {
-            stderr += chunk;
-            stderrBuffer += chunk;
-        }
-
-        let buffer = isStdout
-            ? stdoutBuffer
-            : stderrBuffer;
-
-        const lines = buffer.split('\n');
-        buffer = lines.pop();
-
-        if (isStdout) {
-            stdoutBuffer = buffer;
-        }
-        else {
-            stderrBuffer = buffer;
-        }
-
-        for (const line of lines) {
-            parseLogLine(line);
-        }
-    };
-
-    const parseLogLine = line => {
-        if (!line.trim()) return;
-
-        try {
-            const entry = JSON.parse(line);
-
+        onLog: entry => {
             logs.push(entry);
             onLog?.(entry);
-        }
-        catch {
-            // Normální výstup příkazů jako `rclone version`
-            // není rclone log, takže ho do logs nedáváme.
-        }
-    };
+        },
 
-    proc.stdout.on('data', chunk => {
-        handleLines(chunk.toString(), 'stdout');
+        onStdout: chunk => {
+            stdout += chunk;
+        },
+
+        onStderr: chunk => {
+            stderr += chunk;
+        }
     });
 
-    proc.stderr.on('data', chunk => {
-        handleLines(chunk.toString(), 'stderr');
+    proc.once('error', error => {
+        spawnError = error;
     });
-
-    proc.once('error', reject);
 
     proc.once('close', (code, signal) => {
-
-        // Zpracovat případný poslední neukončený řádek
-        parseLogLine(stdoutBuffer);
-        parseLogLine(stderrBuffer);
 
         const result = {
             code,
@@ -88,14 +152,20 @@ export const runRclone = (args, onLog) => new Promise((resolve, reject) => {
             logs
         };
 
+        if (spawnError) {
+            spawnError.result = result;
+            reject(spawnError);
+            return;
+        }
+
         if (code === 0) {
             resolve(result);
+            return;
         }
-        else {
-            const error = new Error(`rclone exited with code ${code}`);
-            error.result = result;
 
-            reject(error);
-        }
+        const error = new Error(`rclone exited with code ${code}`);
+        error.result = result;
+
+        reject(error);
     });
 });
