@@ -4,9 +4,9 @@ import { RCloneWatch } from "./RCloneWatch";
 import { RCloneRun } from "./RCloneRun";
 import { EventTrigger } from "../events/Event";
 import { chokidarActionTranslate, parseRclonePath, toRelativePath } from "./tools";
-import { ActivityParser, bisyncActivityParsers } from "../activity/ActivityParser";
 import { ActivityFootprints } from "../activity/ActivityFootprints";
 import nodePath from "path";
+import { createBisyncActivityParser } from "../activity/parsers";
 
 
 export class RCloneBisync extends RCloneRun {
@@ -24,10 +24,11 @@ export class RCloneBisync extends RCloneRun {
             runOnInit, partialSuffix = '.partial',
             remoteFootprintTtl = 10 * 1000,
             localFootprintTtl = 5 * 1000,
+            footprintToleranceMs = 50,
             forceResyncMs = 15 * 60 * 1000, //15 min resync
             debounceSoftMs = 5 * 1000, //5sec
             debunceHardMs = 5 * 60 * 1000, //5min
-            chokidarDelayMs = 500 //0.5sec
+            chokidarDelayMs = 500, //0.5sec
         } = cfg;
 
         super(appRoot);
@@ -39,7 +40,7 @@ export class RCloneBisync extends RCloneRun {
 
         const afps = new ActivityFootprints({ remote: remoteFootprintTtl, local: localFootprintTtl });
         this.#activityParsers = {
-            bisync:new ActivityParser(bisyncActivityParsers, localPath, remoteName, afps.createHandler())
+            bisync: createBisyncActivityParser(localPath, remoteName, afps.createHandler())
         }
 
         const bouncer = this.#bouncer = createQueue(this.#handleTriggers.bind(this), {
@@ -71,7 +72,7 @@ export class RCloneBisync extends RCloneRun {
         localWatch.on('all', (action, path, stats) => {
             setTimeout(_ => {
                 path = this.toRelativePath(path);
-                const match = afps.match("local", path, chokidarActionTranslate(action), stats?.ctime);
+                const match = afps.match("local", path, chokidarActionTranslate(action), stats?.ctimeMs, footprintToleranceMs);
                 this.emit(new EventTrigger(this, "local", { path, action, stats, match }));
             }, chokidarDelayMs);
         });
@@ -131,7 +132,7 @@ export class RCloneBisync extends RCloneRun {
 
     async #handleTriggers(triggersArgs) {
         this.#stopHeartbeat();
-        
+
         const triggers = triggersArgs.map(t => t[0]);
 
         const activityParser = this.#activityParsers.bisync;
@@ -224,4 +225,17 @@ export class RCloneBisync extends RCloneRun {
         }
     }
 
+    async #runTrigger(trigger, opt = {}) {
+        const { action, side, path } = trigger;
+
+        if (action === 'create' || action === 'update') {
+            return this.#runCopy(side, path, opt);
+        }
+
+        if (action === 'delete') {
+            return this.#runDelete(side, path, opt);
+        }
+
+        return this.#runBisync(opt);
+    }
 }

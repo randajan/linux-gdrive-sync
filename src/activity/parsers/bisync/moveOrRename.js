@@ -1,5 +1,5 @@
 import nodePath from "path";
-import { EventActivity } from "../../events/Event";
+import { EventActivity } from "../../../events/Event";
 
 /*
  * ------------------------------------------------------------
@@ -35,6 +35,6 @@ export const parse = (parent, { renamed, object }) => {
 
     const action = nodePath.posix.dirname(sourcePath) === nodePath.posix.dirname(targetPath) ? 'rename' : 'move';
 
-    const side = parent.getCopyTargetSide();
+    const side = parent.getCopyTargetSide() || "local";
     return new EventActivity(action, parent.task, { side, sourcePath, targetPath });
 }

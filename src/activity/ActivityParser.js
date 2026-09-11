@@ -1,17 +1,5 @@
-import * as copyDirection from "./parsers/copyDirection";
-import * as queuedDelete from "./parsers/queuedDelete";
-import * as createOrUpdate from "./parsers/createOrUpdate";
-import * as deleteOrUnlink from "./parsers/deleteOrUnlink";
-import * as moveOrRename from "./parsers/moveOrRename";
 import { parseRclonePath, toRelativePath } from "../rclone/tools";
 
-export const bisyncActivityParsers = [
-    copyDirection,
-    queuedDelete,
-    createOrUpdate,
-    deleteOrUnlink,
-    moveOrRename
-];
 
 const sideFromPathNumber = v=>{
     if (v === 1 || v === "local") { return 'local'; }
@@ -50,10 +38,10 @@ export class ActivityParser {
         }
     }
 
-    getCopyTargetSide() { return this.#copyTargetSide || "?"; }
+    getCopyTargetSide() { return this.#copyTargetSide; }
     setCopyTargetSide(val) { this.#copyTargetSide = sideFromPathNumber(val); }
 
-    getPendingDeleteSide(path) { return this.#pendingDeletes.get(path) ?? "?"; }
+    getPendingDeleteSide(path) { return this.#pendingDeletes.get(path); }
     setPendingDeleteSide(path, val) {
         val = sideFromPathNumber(val);
         if (val) { this.#pendingDeletes.set(path, val); }

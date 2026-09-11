@@ -17,7 +17,7 @@
   },
   "license": "MIT",
   "devDependencies": {
-    "@randajan/simple-lib": "^3.3.0"
+    "@randajan/simple-lib": "^5.0.1"
   },
   "files": [
     "dist",
@@ -38,6 +38,7 @@
     "@randajan/props": "^0.1.4",
     "@randajan/queue": "^2.0.0",
     "chokidar": "^5.0.0",
+    "esbuild-plugin-import-glob": "^0.1.1",
     "fs-ext": "^2.1.1"
   }
 }

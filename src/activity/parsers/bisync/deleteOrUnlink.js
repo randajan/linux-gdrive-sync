@@ -8,7 +8,7 @@
  * stromu také DELETE.
  */
 
-import { EventActivity } from "../../events/Event";
+import { EventActivity } from "../../../events/Event";
 
 
 export const preflight = ({ msg, object }) =>{
@@ -20,7 +20,7 @@ export const parse = (parent, logObject) => {
 
     if (!candidatePath) { return; }
 
-    const side = detectedSide ?? parent.getPendingDeleteSide(candidatePath);
+    const side = detectedSide ?? parent.getPendingDeleteSide(candidatePath) ?? "local";
 
     parent.setPendingDeleteSide(candidatePath);
 

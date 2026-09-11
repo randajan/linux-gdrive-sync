@@ -6,8 +6,8 @@ export const preflight = ({ msg, object }) =>{
 }
 
 export const parse = (parent, { action, object }) => {
-    const side = parent.getCopyTargetSide();
     const targetPath = parent.toRelativePath(object);
-    if (!targetPath || !side) { return; }
+    if (!targetPath) { return; }
+    const side = parent.getCopyTargetSide() || "local";
     return new EventActivity(action, parent.task, { side, targetPath });
 }

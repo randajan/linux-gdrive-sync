@@ -48,7 +48,7 @@ export class ActivityFootprints {
         }
     }
 
-    match(side, path, action=undefined, ts=undefined) {
+    match(side, path, action=undefined, ts=undefined, toleranceMs=50) {
         const map = this.#map[side];
         if (!map) { return; }
 
@@ -59,7 +59,7 @@ export class ActivityFootprints {
             return Object.freeze({ matched:false, mismatch:"action", footprint });
         }
 
-        if (ts && !compareNumber(ts, footprint.ts, 50)) {
+        if (ts && !compareNumber(ts, footprint.ts, toleranceMs)) {
             return Object.freeze({ matched:false, mismatch:"ts", footprint });
         }
 
